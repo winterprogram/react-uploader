@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { FiArrowUpCircle } from "react-icons/fi";
 
-export const UploadFile = () => {
+export const UploadFile = (props: { onChange: (e: File) => void }) => {
   const ref = useRef<HTMLInputElement>(null);
 
   return (
@@ -16,7 +16,9 @@ export const UploadFile = () => {
         className="hidden"
         type="file"
         onClick={(event) => ((event.target as HTMLInputElement).value = "")}
-        onChange={() => console.log("upload")}
+        onChange={async (e) => {
+          if (e.target.files?.[0]) props.onChange(e.target.files[0]);
+        }}
       />
     </div>
   );

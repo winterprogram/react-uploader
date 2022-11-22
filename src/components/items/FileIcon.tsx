@@ -2,18 +2,19 @@ import { FileType } from "../../enums";
 import {
   ImFileEmpty,
   ImFileMusic,
-  ImFilePdf,
   ImFilePicture,
+  ImFileText2,
   ImFileVideo,
   ImFileZip,
 } from "react-icons/im";
+import { getFileType } from "../../utils";
 
 export const FileIcon = (props: { type: string; className: string }) => {
-  switch (props.type) {
+  switch (getFileType(props.type)) {
     case FileType.Image:
       return <ImFilePicture className={props.className} />;
     case FileType.Document:
-      return <ImFilePdf className={props.className} />;
+      return <ImFileText2 className={props.className} />;
     case FileType.Audio:
       return <ImFileMusic className={props.className} />;
     case FileType.Video:

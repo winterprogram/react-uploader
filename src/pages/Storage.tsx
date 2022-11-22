@@ -6,64 +6,51 @@ import StorageLayout from "../components/layout/StorageLayout";
 import AOS from "aos";
 import "aos/dist/aos.css";
 import { ItemDetail } from "../components/items/ItemDetail";
-import { FileData } from "../types";
+import { UserData } from "../types";
 import _ from "lodash";
 import dayjs from "dayjs";
-import { FileType } from "../enums";
 import { FileIcon } from "../components/items/FileIcon";
 import { saveAs } from "file-saver";
+import { useNavigate } from "react-router-dom";
+import { getData, getFileType, handleLogout, uploadFile } from "../utils";
+import { FileType } from "../enums";
+import toast from "react-hot-toast";
 
 AOS.init();
 
-const data: FileData[] = [
-  {
-    name: "Temp PDF File",
-    size: "44 KB",
-    type: "document" as FileType,
-    extention: "pdf",
-    date_added: dayjs().toString(),
-    link: "https://clri-ltc.ca/files/2018/09/TEMP-PDF-Document.pdf",
-  },
-  {
-    name: "Temp Image File",
-    size: "449 KB",
-    type: "image" as FileType,
-    extention: "jpeg",
-    date_added: dayjs().toString(),
-    link: "https://clri-ltc.ca/files/2018/09/TEMP-PDF-Document.pdf",
-  },
-  {
-    name: "Temp Audio File",
-    size: "4.5 MB",
-    type: "audio" as FileType,
-    extention: "mp3",
-    date_added: dayjs().toString(),
-    link: "https://clri-ltc.ca/files/2018/09/TEMP-PDF-Document.pdf",
-  },
-  {
-    name: "Temp Video File",
-    size: "44 MB",
-    type: "video" as FileType,
-    extention: "mp4",
-    date_added: dayjs().toString(),
-    link: "https://clri-ltc.ca/files/2018/09/TEMP-PDF-Document.pdf",
-  },
-];
-
 const Storage = () => {
   const [view, setView] = useState("list");
-  const [selectedItem, setSelectedItem] = useState<FileData>(
-    null as unknown as FileData
-  );
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [data, setData] = useState<any>([]);
   const ref = useRef<HTMLTableSectionElement>(null);
+  const navigate = useNavigate();
+  const [userData] = useState<UserData>(
+    JSON.parse(localStorage.getItem("userData") as string)
+  );
+
   const handleClickOutside = (e: Event) => {
     if ((e.target as any)?.offsetParent !== ref.current) {
-      setSelectedItem(null as unknown as FileData);
+      setSelectedItem(null);
     }
   };
 
+  const upload = async (file: File) => {
+    let newFile = await uploadFile(file);
+    setData((prev: any) => [...prev, newFile]);
+  };
+
+  useEffect(() => {
+    if (!userData || (!localStorage.getItem("token") as boolean)) navigate("/");
+    if (userData?.exp > Date.now()) handleLogout();
+    (async () => {
+      let tempData = await getData();
+      setData(tempData);
+    })();
+  }, [userData, navigate]);
+
   useEffect(() => {
     document.addEventListener("click", handleClickOutside, true);
+
     return () => {
       document.removeEventListener("click", handleClickOutside, true);
     };
@@ -78,7 +65,15 @@ const Storage = () => {
           Cloud Storage
         </div>
         <div className="flex items-center space-x-6">
-          <UploadFile />
+          <UploadFile
+            onChange={async (e: File) => {
+              toast.promise(upload(e), {
+                loading: "Uploading",
+                success: `${e.name} uploaded successfully`,
+                error: (err) => err.message || "Unable to upload the file.",
+              });
+            }}
+          />
           <div className="flex items-center text-lg space-x-4">
             <FaListUl
               onClick={() => setView("list")}
@@ -104,7 +99,10 @@ const Storage = () => {
           </div>
         </div>
       </div>
-      <div className="bg-gray-100 min-h-[calc(100vh-108px)]">
+      <div
+        className="bg-gray-100 overflow-auto w-screen
+       min-h-[calc(100vh-108px)] max-h-[calc(100vh-108px)]"
+      >
         {view === "list" ? (
           <table className="w-[calc(100%-2rem)] mx-5 mt-3">
             <thead data-aos="zoom-in" className="">
@@ -116,13 +114,13 @@ const Storage = () => {
               </tr>
             </thead>
             <tbody ref={ref} className="text-sm">
-              {data.map((_file, key) => {
+              {data.map((_file: any, key: number) => {
                 return (
                   <tr
                     data-aos="zoom-in"
                     onDoubleClick={async () => {
                       setSelectedItem(_file);
-                      saveAs(_file.link);
+                      saveAs(_file.file_link, _file.file_name);
                     }}
                     onClick={() => setSelectedItem(_file)}
                     key={key}
@@ -136,8 +134,8 @@ const Storage = () => {
                       }`}
                     >
                       <div className="flex items-center gap-2 ">
-                        <FileIcon className="text-lg " type={_file.type} />{" "}
-                        {_file.name}
+                        <FileIcon className="text-lg " type={_file.file_type} />{" "}
+                        {_file.file_name}
                       </div>
                     </td>
                     <td
@@ -147,7 +145,7 @@ const Storage = () => {
                           : "border-white group-hover:border-purple-50"
                       }`}
                     >
-                      {_file.size}
+                      {_file.file_size || "NA"}
                     </td>
                     <td
                       className={`bg-white group-hover:text-purple-600 group-hover:bg-purple-50 transition-all duration-200 ease-in border-y ${
@@ -156,7 +154,10 @@ const Storage = () => {
                           : "border-white group-hover:border-purple-50"
                       }`}
                     >
-                      {_file.extention.toUpperCase()} {_.startCase(_file.type)}
+                      {_file.file_type.toUpperCase()}{" "}
+                      {getFileType(_file.file_type) !== FileType.ZIP
+                        ? _.startCase(getFileType(_file.file_type))
+                        : "File"}
                     </td>
                     <td
                       className={`rounded-r-lg bg-white group-hover:text-purple-600 group-hover:bg-purple-50 transition-all duration-200 ease-in border border-l-0 ${
@@ -165,7 +166,7 @@ const Storage = () => {
                           : "border-white group-hover:border-purple-50"
                       }`}
                     >
-                      {dayjs(_file.date_added).format("DD/MM/YYYY HH:mm")}
+                      {dayjs(_file.created_at).format("DD/MM/YYYY HH:mm")}
                     </td>
                   </tr>
                 );
@@ -174,33 +175,33 @@ const Storage = () => {
           </table>
         ) : (
           <div className="w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 2xl:grid-cols-8 gap-4 sm:gap-5 xl:gap-7 p-4 sm:p-5 xl:p-7">
-            {data.map((_file, key) => {
+            {data.map((_file: any, key: number) => {
               return (
                 <div data-aos="zoom-in" key={key}>
                   <div
                     onDoubleClick={() => {
                       setSelectedItem(_file);
-                      saveAs(_file.link);
+                      saveAs(_file.file_link);
                     }}
                     onClick={() => setSelectedItem(_file)}
-                    className={`bg-white rounded-lg flex flex-col items-center justify-center p-2 cursor-pointer group hover:font-semibold hover:bg-purple-50 hover:shadow-md transition-all duration-200 ease-in ${
+                    className={`bg-white h-full text-center rounded-lg flex flex-col items-center justify-center p-2 cursor-pointer group hover:font-semibold hover:bg-purple-50 hover:shadow-md transition-all duration-200 ease-in ${
                       selectedItem === _file &&
                       "border border-purple-600 shadow-md"
                     }`}
                   >
                     <FileIcon
                       className="text-6xl md:text-7xl 2xl:text-8xl my-4 sm:my-5 group-hover:text-purple-600 transition-all duration-200 ease-in"
-                      type={_file.type}
+                      type={_file.file_type}
                     />
-                    {_file.name}
+                    {_.truncate(_file.file_name, { length: 18 })}
                   </div>
                 </div>
               );
             })}
           </div>
         )}
+        <ItemDetail fileData={selectedItem} show={!_.isEmpty(selectedItem)} />
       </div>
-      <ItemDetail fileData={selectedItem} show={!_.isEmpty(selectedItem)} />
     </StorageLayout>
   );
 };
